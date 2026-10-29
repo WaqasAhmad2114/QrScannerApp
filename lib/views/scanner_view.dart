@@ -94,6 +94,20 @@ class ScannerView extends GetView<ScannerController> {
                 controller: controller.camera,
                 onDetect: controller.onDetect,
                 fit: BoxFit.cover,
+                // Surface camera failures instead of leaving a blank screen.
+                errorBuilder: (context, error, child) => _withBackButton(
+                  context,
+                  CommonStatusView(
+                    icon: Icons.videocam_off_outlined,
+                    title: AppStrings.cameraErrorTitle,
+                    message: error.errorCode ==
+                        MobileScannerErrorCode.unsupported
+                        ? AppStrings.cameraUnsupported
+                        : AppStrings.cameraErrorMessage,
+                    buttonLabel: AppStrings.retry,
+                    onPressed: controller.retryCamera,
+                  ),
+                ),
               ),
             ),
             Positioned.fill(child: ScanFrameOverlay(frameSize: frame)),

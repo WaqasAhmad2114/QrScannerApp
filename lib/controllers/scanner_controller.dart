@@ -26,6 +26,7 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
   /// Prevents duplicate scans/navigation from repeated camera frames.
   bool _handled = false;
   bool _requesting = false;
+  bool _starting = false;
   DateTime _lastUnsupportedNotice = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
@@ -109,6 +110,10 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
   // ------------------------------------------------------------------- camera
 
   Future<void> _startCamera() async {
+    // Guard against overlapping starts (permission callback + resume both
+    // try to start the camera).
+    if (_starting) return;
+    _starting = true;
     try {
       await camera.start();
       cameraError.value = null;
@@ -116,13 +121,18 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
       if (e.errorCode == MobileScannerErrorCode.controllerAlreadyInitialized) {
         return;
       }
-      cameraError.value = e.errorCode == MobileScannerErrorCode.unsupported
-          ? AppStrings.cameraUnsupported
-          : AppStrings.cameraErrorMessage;
+      cameraError.value = _messageFor(e);
     } catch (_) {
       cameraError.value = AppStrings.cameraErrorMessage;
+    } finally {
+      _starting = false;
     }
   }
+
+  String _messageFor(MobileScannerException e) =>
+      e.errorCode == MobileScannerErrorCode.unsupported
+          ? AppStrings.cameraUnsupported
+          : AppStrings.cameraErrorMessage;
 
   Future<void> _stopCamera() async {
     try {
@@ -134,6 +144,7 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
 
   Future<void> retryCamera() async {
     cameraError.value = null;
+    await _stopCamera();
     await _startCamera();
   }
 
@@ -177,11 +188,14 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
   Future<void> _openResult(String value) async {
     _handled = true;
     await _stopCamera();
-    await Get.toNamed<void>(AppRoutes.result, arguments: value);
-    // Back from Results (Scan Again or system back): scan a new code.
-    _handled = false;
-    if (permission.value == CameraPermissionState.granted) {
-      await _startCamera();
+    try {
+      await Get.toNamed<void>(AppRoutes.result, arguments: value);
+    } finally {
+      // Always reset, even if navigation fails, so scanning can't get stuck.
+      _handled = false;
+      if (permission.value == CameraPermissionState.granted) {
+        await _startCamera();
+      }
     }
   }
 }
