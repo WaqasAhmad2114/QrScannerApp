@@ -1,0 +1,60 @@
+name: quickscan_qr
+description: Fast, offline QR code scanner. Scan, copy, share and open links.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management + navigation
+  get: ^4.6.6
+
+  # Camera QR detection (ML Kit on Android, Vision on iOS)
+  mobile_scanner: ^6.0.2
+
+  # Camera permission + open app Settings
+  permission_handler: ^11.3.1
+
+  # Native share sheet
+  share_plus: ^10.1.4
+
+  # Open http/https links in the browser
+  url_launcher: ^6.3.1
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+  # App icon and native splash generators
+  flutter_launcher_icons: ^0.14.1
+  flutter_native_splash: ^2.4.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icon/
+
+# ---------- App icon ----------
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/icon/app_icon.png
+  adaptive_icon_background: "#0B1426"
+  adaptive_icon_foreground: assets/icon/app_icon_foreground.png
+  remove_alpha_ios: true
+
+# ---------- Native splash (shows before Flutter starts) ----------
+flutter_native_splash:
+  color: "#0B1426"
+  image: assets/icon/app_icon_foreground.png
+  android_12:
+    color: "#0B1426"
+    image: assets/icon/app_icon_foreground.png
