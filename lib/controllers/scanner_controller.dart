@@ -5,21 +5,17 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../common_widgets/common_dialog.dart';
 import '../common_widgets/common_snackbar.dart';
+import '../constants/app_config.dart';
 import '../constants/app_strings.dart';
 import '../routes/app_routes.dart';
 
 enum CameraPermissionState { checking, granted, denied, permanentlyDenied }
 
 class ScannerController extends GetxController with WidgetsBindingObserver {
-  final MobileScannerController camera = MobileScannerController(
-    autoStart: false,
-    formats: const [BarcodeFormat.qrCode],
-    detectionSpeed: DetectionSpeed.noDuplicates,
-    facing: CameraFacing.back,
-  );
+  late final MobileScannerController camera;
 
   final Rx<CameraPermissionState> permission =
-      CameraPermissionState.checking.obs;
+  Rx<CameraPermissionState>(CameraPermissionState.checking);
   final RxnString cameraError = RxnString();
 
   /// True from the first detection until the user returns from Results.
@@ -32,15 +28,50 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
   @override
   void onInit() {
     super.onInit();
+    camera = MobileScannerController(
+      autoStart: false,
+      formats: const [BarcodeFormat.qrCode],
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+    );
+    // Any camera error (also those raised by the preview widget) shows the
+    // retry state instead of a blank screen.
+    camera.addListener(_onCameraValueChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    // Ask for permission after the first frame is on screen.
     requestPermission();
   }
 
   @override
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
+    camera.removeListener(_onCameraValueChanged);
     camera.dispose();
     super.onClose();
+  }
+
+  void _onCameraValueChanged() {
+    final error = camera.value.error;
+    if (error == null || camera.value.isRunning) return;
+    _setError(error);
+  }
+
+  void _setError(MobileScannerException e) {
+    if (e.errorCode == MobileScannerErrorCode.controllerAlreadyInitialized) {
+      return;
+    }
+    final base = e.errorCode == MobileScannerErrorCode.unsupported
+        ? AppStrings.cameraUnsupported
+        : AppStrings.cameraErrorMessage;
+    final detail = e.errorDetails?.message ?? e.errorDetails?.details;
+    cameraError.value = AppConfig.showErrorDetails
+        ? '$base\n\n[${e.errorCode.name}] ${detail ?? ''}'
+        : base;
   }
 
   // ---------------------------------------------------------------- lifecycle
@@ -75,6 +106,8 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
         status = await Permission.camera.request();
       }
       await _applyStatus(status, announce: true);
+    } catch (_) {
+      permission.value = CameraPermissionState.denied;
     } finally {
       _requesting = false;
     }
@@ -110,29 +143,23 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
   // ------------------------------------------------------------------- camera
 
   Future<void> _startCamera() async {
-    // Guard against overlapping starts (permission callback + resume both
-    // try to start the camera).
-    if (_starting) return;
+    // Never run two start() calls at once (permission dialog + lifecycle
+    // resume used to trigger a second start and caused a generic error).
+    if (_starting || camera.value.isRunning) return;
     _starting = true;
     try {
       await camera.start();
       cameraError.value = null;
     } on MobileScannerException catch (e) {
-      if (e.errorCode == MobileScannerErrorCode.controllerAlreadyInitialized) {
-        return;
-      }
-      cameraError.value = _messageFor(e);
-    } catch (_) {
-      cameraError.value = AppStrings.cameraErrorMessage;
+      _setError(e);
+    } catch (e) {
+      cameraError.value = AppConfig.showErrorDetails
+          ? '${AppStrings.cameraErrorMessage}\n\n$e'
+          : AppStrings.cameraErrorMessage;
     } finally {
       _starting = false;
     }
   }
-
-  String _messageFor(MobileScannerException e) =>
-      e.errorCode == MobileScannerErrorCode.unsupported
-          ? AppStrings.cameraUnsupported
-          : AppStrings.cameraErrorMessage;
 
   Future<void> _stopCamera() async {
     try {
@@ -144,7 +171,6 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
 
   Future<void> retryCamera() async {
     cameraError.value = null;
-    await _stopCamera();
     await _startCamera();
   }
 
@@ -188,14 +214,11 @@ class ScannerController extends GetxController with WidgetsBindingObserver {
   Future<void> _openResult(String value) async {
     _handled = true;
     await _stopCamera();
-    try {
-      await Get.toNamed<void>(AppRoutes.result, arguments: value);
-    } finally {
-      // Always reset, even if navigation fails, so scanning can't get stuck.
-      _handled = false;
-      if (permission.value == CameraPermissionState.granted) {
-        await _startCamera();
-      }
+    await Get.toNamed<void>(AppRoutes.result, arguments: value);
+    // Back from Results (Scan Again or system back): scan a new code.
+    _handled = false;
+    if (permission.value == CameraPermissionState.granted) {
+      await _startCamera();
     }
   }
 }

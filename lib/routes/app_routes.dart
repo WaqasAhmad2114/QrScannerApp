@@ -1,7 +1,5 @@
 import 'package:get/get.dart';
 
-import '../controllers/result_controller.dart';
-import '../controllers/scanner_controller.dart';
 import '../controllers/splash_controller.dart';
 import '../views/home_view.dart';
 import '../views/result_view.dart';
@@ -27,15 +25,7 @@ class AppPages {
       binding: BindingsBuilder(() => Get.put(SplashController())),
     ),
     GetPage(name: AppRoutes.home, page: () => const HomeView()),
-    GetPage(
-      name: AppRoutes.scanner,
-      page: () => const ScannerView(),
-      binding: BindingsBuilder(() => Get.put(ScannerController())),
-    ),
-    GetPage(
-      name: AppRoutes.result,
-      page: () => const ResultView(),
-      binding: BindingsBuilder(() => Get.put(ResultController())),
-    ),
+    GetPage(name: AppRoutes.scanner, page: () => const ScannerView()),
+    GetPage(name: AppRoutes.result, page: () => const ResultView()),
   ];
 }

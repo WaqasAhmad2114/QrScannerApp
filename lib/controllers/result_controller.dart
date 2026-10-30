@@ -7,20 +7,16 @@ import '../common_widgets/common_snackbar.dart';
 import '../constants/app_strings.dart';
 import '../utils/url_helper.dart';
 
-class ResultController extends GetxController {
-  late final String value;
-  late final Uri? webUri;
+/// Plain class (not registered in GetX), created by ResultView
+/// from the scanned value so it can never be "not found".
+class ResultController {
+  ResultController(this.value) : webUri = UrlHelper.parseWebUrl(value);
+
+  final String value;
+  final Uri? webUri;
 
   bool get isEmpty => value.trim().isEmpty;
   bool get isLink => webUri != null;
-
-  @override
-  void onInit() {
-    super.onInit();
-    final args = Get.arguments;
-    value = args is String ? args : '';
-    webUri = UrlHelper.parseWebUrl(value);
-  }
 
   Future<void> copy() async {
     if (isEmpty) return;

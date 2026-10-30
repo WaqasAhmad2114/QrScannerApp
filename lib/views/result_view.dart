@@ -8,11 +8,13 @@ import '../constants/app_strings.dart';
 import '../controllers/result_controller.dart';
 import '../utils/size_utils.dart';
 
-class ResultView extends GetView<ResultController> {
+class ResultView extends StatelessWidget {
   const ResultView({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final args = Get.arguments;
+    final controller = ResultController(args is String ? args : '');
     final isLink = controller.isLink;
     final isEmpty = controller.isEmpty;
 
